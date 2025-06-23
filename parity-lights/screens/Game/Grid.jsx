@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Pressable, Animated, Vibration, Dimensions } from 'react-native';
+import { View, Pressable, Animated, Vibration } from 'react-native';
 
 export default function Grid({ width, height, screenWidth, pattern, navigation }) {
   const cellSize = Math.floor((screenWidth - 4 - (width - 1)) / width);
@@ -12,9 +12,15 @@ export default function Grid({ width, height, screenWidth, pattern, navigation }
     Array.from({ length: height }, () => Array.from({ length: width }, () => Math.random() < 0.5))
   );
 
-  const animatedValues = useRef(
+  const animatedScales = useRef(
     Array.from({ length: height }, () =>
-      Array.from({ length: width }, () => new Animated.ValueXY({ x: 0, y: 0 }))
+      Array.from({ length: width }, () => new Animated.Value(1))
+    )
+  ).current;
+
+  const animatedRotations = useRef(
+    Array.from({ length: height }, () =>
+      Array.from({ length: width }, () => new Animated.Value(0))
     )
   ).current;
 
@@ -26,7 +32,6 @@ export default function Grid({ width, height, screenWidth, pattern, navigation }
   const centerCol = Math.floor(width / 2);
 
   useEffect(() => {
-    // Initialize grid from subGrid
     const temp = gridData.map(r => [...r]);
     subGrid.forEach((row, r) => {
       row.forEach((v, c) => {
@@ -54,135 +59,74 @@ export default function Grid({ width, height, screenWidth, pattern, navigation }
     setTimeout(() => {
       if (newGrid.every(row => row.every(cell => !cell))) {
         Vibration.vibrate(300);
-        startFold();
+        startVictoryAnimation();
       }
     }, 10);
   };
 
-  const startFold = async () => {
-    let curTop = 0,
-      curBottom = height - 1,
-      curLeft = 0,
-      curRight = width - 1;
+  const startVictoryAnimation = async () => {
+    const animations = [];
+    for (let r = 0; r < height; r++) {
+      for (let c = 0; c < width; c++) {
+        const dx = c - centerCol;
+        const dy = r - centerRow;
+        const delay = Math.sqrt(dx * dx + dy * dy) * 75;
 
-    while (curTop < curBottom || curLeft < curRight) {
-      const promises = [];
-
-      // Left -> Right
-      if (curLeft < curRight) {
-        for (let r = curTop; r <= curBottom; r++) {
-          for (let c = curLeft; c < Math.floor((curLeft + curRight + 1) / 2); c++) {
-            const mirrorCol = curRight - (c - curLeft);
-            promises.push(
-              animateAndHide(r, c, mirrorCol - c, 0)
-            );
-          }
-        }
-        curLeft = Math.floor((curLeft + curRight + 1) / 2);
-        await Promise.all(promises);
-      }
-
-      // Top -> Bottom
-      if (curTop < curBottom) {
-        const promises = [];
-        for (let c = curLeft; c <= curRight; c++) {
-          for (let r = curTop; r < Math.floor((curTop + curBottom + 1) / 2); r++) {
-            const mirrorRow = curBottom - (r - curTop);
-            promises.push(
-              animateAndHide(r, c, 0, mirrorRow - r)
-            );
-          }
-        }
-        curTop = Math.floor((curTop + curBottom + 1) / 2);
-        await Promise.all(promises);
-      }
-
-      // Right -> Left
-      if (curLeft < curRight) {
-        const promises = [];
-        for (let r = curTop; r <= curBottom; r++) {
-          for (let c = curRight; c > Math.floor((curLeft + curRight) / 2); c--) {
-            const mirrorCol = curLeft + (curRight - c);
-            promises.push(
-              animateAndHide(r, c, mirrorCol - c, 0)
-            );
-          }
-        }
-        curRight = Math.floor((curLeft + curRight) / 2);
-        await Promise.all(promises);
-      }
-
-      // Bottom -> Top
-      if (curTop < curBottom) {
-        const promises = [];
-        for (let c = curLeft; c <= curRight; c++) {
-          for (let r = curBottom; r > Math.floor((curTop + curBottom) / 2); r--) {
-            const mirrorRow = curTop + (curBottom - r);
-            promises.push(
-              animateAndHide(r, c, 0, mirrorRow - r)
-            );
-          }
-        }
-        curBottom = Math.floor((curTop + curBottom) / 2);
-        await Promise.all(promises);
+        animations.push(
+          new Promise(resolve => {
+            setTimeout(() => {
+              Animated.parallel([
+                Animated.timing(animatedScales[r][c], {
+                  toValue: 0,
+                  duration: 300,
+                  useNativeDriver: true,
+                }),
+                Animated.timing(animatedRotations[r][c], {
+                  toValue: 1,
+                  duration: 300,
+                  useNativeDriver: true,
+                }),
+              ]).start(() => resolve());
+            }, delay);
+          })
+        );
       }
     }
 
-    // Blink center cell
-    const blinkCell = animatedValues[centerRow][centerCol];
-    Animated.sequence([
-      Animated.timing(blinkCell, {
-        toValue: { x: 0, y: 0 }, duration: 150, useNativeDriver: true
-      }),
-      Animated.timing(blinkCell, {
-        toValue: { x: 0, y: 0 }, duration: 150, useNativeDriver: true
-      }),
-    ]).start(() => navigation.navigate('Home'));
-  };
-
-  const animateAndHide = (row, col, dx, dy) => {
-    return new Promise(resolve => {
-      Animated.timing(animatedValues[row][col], {
-        toValue: { x: dx * cellSize, y: dy * cellSize },
-        duration: 250,
-        useNativeDriver: true,
-      }).start(() => {
-        setVisibleCells(prev => {
-          const newVis = prev.map(r => [...r]);
-          newVis[row][col] = false;
-          return newVis;
-        });
-        resolve();
-      });
-    });
+    await Promise.all(animations);
+    navigation.navigate('Home');
   };
 
   return (
-    <View
-      style={{
-        borderWidth: 2,
-        borderColor: 'white',
-        padding: 1,
-        backgroundColor: 'white',
-      }}
-    >
-      {gridData.map((row, rowIndex) => (
-        <View key={rowIndex} style={{ flexDirection: 'row' }}>
-          {row.map((cell, colIndex) => {
-            if (!visibleCells[rowIndex][colIndex]) return null;
+    <View style={{ backgroundColor: 'black' }}>
+      {gridData.map((row, r) => (
+        <View key={r} style={{ flexDirection: 'row' }}>
+          {row.map((cell, c) => {
+            if (!visibleCells[r][c]) return null;
+
+            const rotate = animatedRotations[r][c].interpolate({
+              inputRange: [0, 1],
+              outputRange: ['0deg', '360deg'],
+            });
+
             return (
               <Animated.View
-                key={colIndex}
+                key={`${r}-${c}`}
                 style={{
-                  transform: animatedValues[rowIndex][colIndex].getTranslateTransform(),
+                  width: cellSize,
+                  height: cellSize,
+                  margin: 0.5,
+                  transform: [
+                    { scale: animatedScales[r][c] },
+                    { rotate },
+                  ],
                 }}
               >
                 <Pressable
-                  onPress={() => handlePress(rowIndex, colIndex)}
+                  onPress={() => handlePress(r, c)}
                   style={{
-                    width: cellSize,
-                    height: cellSize,
-                    margin: 0.5,
+                    width: '100%',
+                    height: '100%',
                     backgroundColor: cell ? 'white' : 'black',
                   }}
                 />
