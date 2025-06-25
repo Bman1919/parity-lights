@@ -5,6 +5,7 @@ import HomeScreen from './screens/HomeScreen';
 import GameScreen from './screens/Game/GameScreen';
 import SettingScreen from './screens/SettingScreen';
 import CustomPatternScreen from './screens/CustomPatternScreen';
+import SandboxScreen from './screens/SandboxScreen.jsx';
 
 const Stack = createNativeStackNavigator();
 
@@ -22,6 +23,7 @@ export default function App() {
           {props => <SettingScreen {...props} setSettings={setSettings} settings={settings} />}
         </Stack.Screen>
         <Stack.Screen name="CustomPattern" component={CustomPatternScreen} />
+        <Stack.Screen name="Sandbox" component={SandboxScreen} settings={settings} />
       </Stack.Navigator>
     </NavigationContainer>
   );

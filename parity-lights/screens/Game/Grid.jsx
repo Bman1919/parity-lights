@@ -1,7 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Pressable, Animated, Vibration } from 'react-native';
+import { View, Pressable, Animated, Vibration, Button } from 'react-native';
 
-export default function Grid({ width, height, screenWidth, pattern, navigation }) {
+export default function Grid({
+  width,
+  height,
+  screenWidth,
+  pattern,
+  navigation,
+  sandbox = false,
+}) {
   const cellSize = Math.floor((screenWidth - 4 - (width - 1)) / width);
 
   const [gridData, setGridData] = useState(
@@ -24,14 +31,11 @@ export default function Grid({ width, height, screenWidth, pattern, navigation }
     )
   ).current;
 
-  const [visibleCells, setVisibleCells] = useState(
-    Array.from({ length: height }, () => Array.from({ length: width }, () => true))
-  );
-
   const centerRow = Math.floor(height / 2);
   const centerCol = Math.floor(width / 2);
 
   useEffect(() => {
+    if (sandbox) return;
     const temp = gridData.map(r => [...r]);
     subGrid.forEach((row, r) => {
       row.forEach((v, c) => {
@@ -52,16 +56,24 @@ export default function Grid({ width, height, screenWidth, pattern, navigation }
 
   const handlePress = (row, col) => {
     const newGrid = gridData.map(r => [...r]);
-    toggleAt(row, col, newGrid);
-    for (const [dy, dx] of pattern) toggleAt(row + dy, col + dx, newGrid);
+
+    if (sandbox) {
+      newGrid[row][col] = !newGrid[row][col];
+    } else {
+      toggleAt(row, col, newGrid);
+      for (const [dy, dx] of pattern) toggleAt(row + dy, col + dx, newGrid);
+    }
+
     setGridData(newGrid);
 
-    setTimeout(() => {
-      if (newGrid.every(row => row.every(cell => !cell))) {
-        Vibration.vibrate(300);
-        startVictoryAnimation();
-      }
-    }, 10);
+    if (!sandbox) {
+      setTimeout(() => {
+        if (newGrid.every(row => row.every(cell => !cell))) {
+          Vibration.vibrate(300);
+          startVictoryAnimation();
+        }
+      }, 10);
+    }
   };
 
   const startVictoryAnimation = async () => {
@@ -97,13 +109,32 @@ export default function Grid({ width, height, screenWidth, pattern, navigation }
     navigation.navigate('Home');
   };
 
+  const clearGrid = () => {
+    setGridData(
+      Array.from({ length: height }, () => Array.from({ length: width }, () => false))
+    );
+  };
+
+  const randomizeGrid = () => {
+    setGridData(
+      Array.from({ length: height }, () =>
+        Array.from({ length: width }, () => Math.random() < 0.5)
+      )
+    );
+  };
+
   return (
-    <View style={{ backgroundColor: 'black' }}>
+    <View style={{ backgroundColor: 'black', alignItems: 'center' }}>
+      {sandbox && (
+        <View style={{ flexDirection: 'row', marginVertical: 8 }}>
+          <Button title="Clear" onPress={clearGrid} color="#888" />
+          <View style={{ width: 16 }} />
+          <Button title="Randomize" onPress={randomizeGrid} color="#888" />
+        </View>
+      )}
       {gridData.map((row, r) => (
         <View key={r} style={{ flexDirection: 'row' }}>
           {row.map((cell, c) => {
-            if (!visibleCells[r][c]) return null;
-
             const rotate = animatedRotations[r][c].interpolate({
               inputRange: [0, 1],
               outputRange: ['0deg', '360deg'],
@@ -116,10 +147,7 @@ export default function Grid({ width, height, screenWidth, pattern, navigation }
                   width: cellSize,
                   height: cellSize,
                   margin: 0.5,
-                  transform: [
-                    { scale: animatedScales[r][c] },
-                    { rotate },
-                  ],
+                  transform: [{ scale: animatedScales[r][c] }, { rotate }],
                 }}
               >
                 <Pressable

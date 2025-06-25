@@ -63,6 +63,22 @@ export default function HomeScreen({ navigation }) {
       >
         <Text style={{ color: '#000', fontSize: 18, fontWeight: 'bold' }}>Start Game</Text>
       </Pressable>
+
+      <Pressable
+        onPress={() => navigation.navigate('Sandbox')}
+        style={({ pressed }) => ({
+          backgroundColor: pressed ? '#0f0' : '#1f1',
+          paddingVertical: 16,
+          paddingHorizontal: 32,
+          borderRadius: 12,
+          shadowColor: '#0f0',
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.9,
+          shadowRadius: 10,
+        })}
+      >
+        <Text style={{ color: '#000', fontSize: 18, fontWeight: 'bold' }}>Sandbox</Text>
+      </Pressable>
     </View>
   );
 }
